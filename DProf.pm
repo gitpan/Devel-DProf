@@ -1,272 +1,247 @@
-# -*- perl -*-
-
-# Copyright (c) 2006 by Jeff Weisberg
-# Author: Jeff Weisberg <jaw+dprof @ tcp4me.com>
-# Created: 2006-Mar-11 22:16 (EST)
-# Function: code profiler
-#
-# $Id: DProfLB.pm,v 1.4 2007/02/04 20:45:33 jaw Exp $
-
-package Devel::DProf;
-# use strict; - does not play well with the debugger
-our $VERSION = '20080628_01';
+use 5.006_001;
 
 =head1 NAME
 
-Devel::DProf - tell me why my perl program runs so slowly
+Devel::DProf - a B<DEPRECATED> Perl code profiler
 
 =head1 SYNOPSIS
 
-    perl -d:DProf program.pl
-    dprofpp
+	perl -d:DProf test.pl
+
+=head1 ACHTUNG!
+
+C<Devel::DProf> is B<DEPRECATED> and will be removed from a future version of
+Perl. We strongly recommend that you install and use L<Devel::NYTProf> instead,
+as it offers significantly improved profiling and reporting.
 
 =head1 DESCRIPTION
 
-The Devel::DProf package is a Perl code profiler.
+The Devel::DProf package is a Perl code profiler.  This will collect
+information on the execution time of a Perl script and of the subs in that
+script.  This information can be used to determine which subroutines are
+using the most time and which subroutines are being called most often.  This
+information can also be used to create an execution graph of the script,
+showing subroutine relationships.
 
-It is intended to produce output similar to, and
-compatible with, Devel::DProf, but be 'Less Bad'.
+To profile a Perl script run the perl interpreter with the B<-d> debugging
+switch.  The profiler uses the debugging hooks.  So to profile script
+F<test.pl> the following command should be used:
 
-This will collect information on the execution time of a Perl
-script and of the subs in that script.  This information
-can be used to determine which subroutines are using the
-most time and which subroutines are being called most
-often.  This information can also be used to create an
-execution graph of the script, showing subroutine
-relationships.
+	perl -d:DProf test.pl
 
-To profile a Perl script run the perl interpreter with the
--d debugging switch.  The profiler uses the debugging
-hooks.  So to profile script test.pl the following command
-should be used:
+When the script terminates (or when the output buffer is filled) the
+profiler will dump the profile information to a file called
+F<tmon.out>.  A tool like I<dprofpp> can be used to interpret the
+information which is in that profile.  The following command will
+print the top 15 subroutines which used the most time:
 
-    perl5 -d:DProf test.pl
+	dprofpp
 
-When the script terminates the profiler will dump the profile information to
-a file called tmon.out.  A tool like dprofpp can be used
-to interpret the information which is in that profile.
-The following command will print the top 15 subroutines
-which used the most time:
+To print an execution graph of the subroutines in the script use the
+following command:
 
-    dprofpp
+	dprofpp -T
 
-To print an execution graph of the subroutines in the
-script use the following command:
+Consult L<dprofpp> for other options.
 
-    dprofpp -T
+=head1 PROFILE FORMAT
 
-Consult the dprofpp manpage for other options.
+The old profile is a text file which looks like this:
+
+	#fOrTyTwO
+	$hz=100;
+	$XS_VERSION='DProf 19970606';
+	# All values are given in HZ
+	$rrun_utime=2; $rrun_stime=0; $rrun_rtime=7
+	PART2
+	+ 26 28 566822884 DynaLoader::import
+	- 26 28 566822884 DynaLoader::import
+	+ 27 28 566822885 main::bar
+	- 27 28 566822886 main::bar
+	+ 27 28 566822886 main::baz
+	+ 27 28 566822887 main::bar
+	- 27 28 566822888 main::bar
+	[....]
+
+The first line is the magic number.  The second line is the hertz value, or
+clock ticks, of the machine where the profile was collected.  The third line
+is the name and version identifier of the tool which created the profile.
+The fourth line is a comment.  The fifth line contains three variables
+holding the user time, system time, and realtime of the process while it was
+being profiled.  The sixth line indicates the beginning of the sub
+entry/exit profile section.
+
+The columns in B<PART2> are:
+
+	sub entry(+)/exit(-) mark
+	app's user time at sub entry/exit mark, in ticks
+	app's system time at sub entry/exit mark, in ticks
+	app's realtime at sub entry/exit mark, in ticks
+	fully-qualified sub name, when possible
+
+With newer perls another format is used, which may look like this:
+
+        #fOrTyTwO
+        $hz=10000;
+        $XS_VERSION='DProf 19971213';
+        # All values are given in HZ
+        $over_utime=5917; $over_stime=0; $over_rtime=5917;
+        $over_tests=10000;
+        $rrun_utime=1284; $rrun_stime=0; $rrun_rtime=1284;
+        $total_marks=6;
+
+        PART2
+        @ 406 0 406
+        & 2 main bar
+        + 2
+        @ 456 0 456
+        - 2
+        @ 1 0 1
+        & 3 main baz
+        + 3
+        @ 141 0 141
+        + 2
+        @ 141 0 141
+        - 2
+        @ 1 0 1
+        & 4 main foo
+        + 4
+        @ 142 0 142
+        + & Devel::DProf::write
+        @ 5 0 5
+        - & Devel::DProf::write
+
+(with high value of $ENV{PERL_DPROF_TICKS}).  
+
+New C<$over_*> values show the measured overhead of making $over_tests
+calls to the profiler These values are used by the profiler to
+subtract the overhead from the runtimes.
+
+Lines starting with C<@> mark the amount of time passed since the
+previous C<@> line.  The numbers following the C<@> are integer tick
+counts representing user, system, and real time.  Divide these numbers
+by the $hz value in the header to get seconds.
+
+Lines starting with C<&> map subroutine identifiers (an integer) to
+subroutine packages and names.  These should only occur once per
+subroutine.
+
+Lines starting with C<+> or C<-> mark normal entering and exit of
+subroutines.  The number following is a reference to a subroutine
+identifier.
+
+Lines starting with C<*> mark where subroutines are entered by C<goto
+&subr>, but note that the return will still be marked as coming from
+the original sub.  The sequence might look like this:
+
+	+ 5
+	* 6
+	- 5
+
+Lines starting with C</> is like C<-> but mark where subroutines are
+exited by dying.  Example:
+
+	+ 5
+	+ 6
+	/ 6
+	/ 5
+
+Finally you might find C<@> time stamp marks surrounded by C<+ &
+Devel::DProf::write> and C<- & Devel::DProf::write> lines.  These 3
+lines are outputted when printing of the mark above actually consumed
+measurable time.
+
+=head1 AUTOLOAD
+
+When Devel::DProf finds a call to an C<&AUTOLOAD> subroutine it looks at the
+C<$AUTOLOAD> variable to find the real name of the sub being called.  See
+L<perlsub/"Autoloading">.
 
 =head1 ENVIRONMENT
 
-=over 4
+C<PERL_DPROF_BUFFER> sets size of output buffer in words.  Defaults to 2**14.
 
-=item C<PERL_DPROF_OUT_FILE_NAME>
+C<PERL_DPROF_TICKS> sets number of ticks per second on some systems where
+a replacement for times() is used.  Defaults to the value of C<HZ> macro.
 
-Filename to save profile data to, default is F<tmon.out>
-
-=back
+C<PERL_DPROF_OUT_FILE_NAME> sets the name of the output file.  If not set,
+defaults to tmon.out.
 
 =head1 BUGS
 
-Valid profiling data is not saved until the application
-terminates and runs this modules END{} block. Applications
-which cause END{} blocks not to run (such as call _exit
-or exec) will leave a corrupt and/or incomplete temporary data file.
+Builtin functions cannot be measured by Devel::DProf.
 
-On most systems, the timing data recorded by this profiler has
-a granularity of 0.01 second. This may or may not be precise
-enough for your application.
+With a newer Perl DProf relies on the fact that the numeric slot of
+$DB::sub contains an address of a subroutine.  Excessive manipulation
+of this variable may overwrite this slot, as in
 
-If the program being profiled contains subroutines which do
-not return in a normal manner (such as by throwing an exception),
-the timing data is estimated and may be attributed incorrectly.
+  $DB::sub = 'current_sub';
+  ...
+  $addr = $DB::sub + 0;
 
-Some buggy XS based perl modules can behave erroneously when
-run under the perl debugger. Since Devel::DProf uses the perl
-debugger interfaces, these modules will also behave erroneously
-when being profiled.
-    
-Et cetera.
+will set this numeric slot to numeric value of the string
+C<current_sub>, i.e., to C<0>.  This will cause a segfault on the exit
+from this subroutine.  Note that the first assignment above does not
+change the numeric slot (it will I<mark> it as invalid, but will not
+write over it).
 
-=head1 SECURITY ISSUES
+Another problem is that if a subroutine exits using goto(LABEL),
+last(LABEL) or next(LABEL) then perl may crash or Devel::DProf will die
+with the error:
 
-The standard dprofpp program blindly C<eval>s portions
-of the tmon.out datafile.
+   panic: Devel::DProf inconsistent subroutine return
+
+For example, this code will break under Devel::DProf:
+
+   sub foo {
+     last FOO;
+   }
+   FOO: {
+     foo();
+   }
+
+A pattern like this is used by Test::More's skip() function, for
+example.  See L<perldiag> for more details.
 
 =head1 SEE ALSO
 
-    Devel::Profile
-    Devel::DProfLB
-    dprofpp
-    Yellowstone National Park
-    
-=head1 AUTHOR
+L<perl>, L<dprofpp>, times(2)
 
-    Jeff Weisberg - http://www.tcp4me.com/
-    
 =cut
-    ;
 
-package DB;
-
-use Time::HiRes 'time';
-use POSIX 'times',	# different than the builtin times
-    'sysconf', '_SC_CLK_TCK';
-
-my @prof_stack = ();	# call stack, to account for subs that haven't returned
-my $realtime_adj;	# because it overflows an int32
-my $hz;			# clock ticks per second
-my $prof_pid;		# process id of process being profiled
-my @overhead;		# calibration overhead
-my $tmpfile;		# temporary data file
-my $monfile    = $ENV{PERL_DPROF_OUT_FILE_NAME} || 'tmon.out';
-my $NCALOOP    = 1000;
-my $calibrated = 0;
-our $sub;
-
-sub DB {}
-
-BEGIN {
-
-    $prof_pid = $$;
-    $tmpfile  = "tmon$$.out";
-    open(PROF, ">$tmpfile") || die "cannot open $tmpfile: $!\n";
-    
-    # calculate hertz
-    eval { $hz = sysconf( _SC_CLK_TCK ) };
-    unless( $hz ){
-	# if unavailable, estimate
-	my($st) = times();
-	sleep 1;
-	my($et) = times();
-	$hz = $et - $st;
-    }
-
-    $realtime_adj = time;
-
-}
-END {
-
-    # original process only, if we fork()
-    return unless $$ == $prof_pid;
-    
-    my($rt, $ut, $st) = prof_times();
-
-    # generate data for any unfinished subs 
-    if( @prof_stack ){
-	print PROF "# the following did not return, due to program termination\n";
-	for my $asx (reverse @prof_stack){
-	    print PROF "- $ut $st $rt $asx\n";
-	}
-    }
-    
-    close PROF;
-
-    # reopen data, add headers, output new file
-    open(TMP, $tmpfile)     || warn "cannot open $tmpfile: $!\n";
-    open(PROF, ">$monfile") || warn "cannot open $monfile: $!\n";
-    
-    # output header
-    print PROF "#fOrTyTwO\n";
-    # this portion of the header is blindly evaled by dprofpp
-    # any valid perl may be placed here
-    # print PR0F "`echo pwned, rm -rf /`;\n"; # Yikes!
-    # print PROF 'warn "SECURITY WARNING: this version of $0 may be unsafe. upgrade?\n";', "\n";
-    print PROF "\$hz=$hz;\n\$XS_VERSION='DProf-$Devel::DProf::VERSION';\n";
-    print PROF "# All timing values are given in HZ\n";
-    print PROF "\$over_utime=$overhead[1]; \$over_stime=$overhead[2]; \$over_rtime=$overhead[0];\n";
-    print PROF "\$over_tests=$NCALOOP;\n";    
-    print PROF "\$rrun_utime=$ut; \$rrun_stime=$st; \$rrun_rtime=$rt;\n";
-    print PROF "PART2\n";
-
-    # remove calibration artifacts
-    while(<TMP>){ last if /^\#CALIBRATED/ }
-    # copy the rest
-    while(<TMP>){ print PROF }
-	
-    close TMP;
-    close PROF;
-    unlink $tmpfile;
-    $prof_pid = undef;
-}
-
-sub prof_times {
-
-    my @t = times;	# POSIX::times for user/sys time
-    $t[0] = (time()	# HiRes::time  for realtime
-	- $realtime_adj) * $hz;
-    @t;
-}
-
-sub sub {
-
-    my($rt, $ut, $st) = prof_times();
-    
-    my $sx = $sub;
-    if( ref $sx ){
-	my @c = caller;
-	# was 0, now 1
-	# nb: @c = (pkg, file, line, ...)
-	$sx = "<anon>:$c[1]:$c[2]";
-    }
-
-    # do not corrupt data on fork()
-    my $noprof = $$ != ($prof_pid || 0);
-    if( $noprof ){
-	close PROF;
-    }
-    
-    print PROF "+ $ut $st $rt $sx\n" unless $noprof;
-    
-    push @prof_stack, $sx;
-    my $ss = @prof_stack;
-    
-    my( $wa, $r, @r );
-    $wa = wantarray;
-    if( $wa ){
-	@r = &$sub;
-    }elsif( defined $wa ){
-	$r = &$sub;
-    }else{
-	&$sub;
-    }
-
-    ($rt, $ut, $st) = prof_times();
-    
-    if( $ss < @prof_stack ){
-	# we took an exception - account for aborted subs
-
-	while( $ss < @prof_stack ){
-	    my $asx = pop @prof_stack;
-	    next if $noprof;
-	    print PROF "# $asx did not return normally\n";
-	    print PROF "- $ut $st $rt $asx\n";
-	}
-    }
-    
-    pop @prof_stack;
-    print PROF "- $ut $st $rt $sx\n" unless $noprof;
-
-    if( $wa ){
-	@r;
-    }else{
-	$r;
-    }
-}
-
-# calculate (estimate) profiler overhead
+# This sub is needed for calibration.
 package Devel::DProf;
-use strict;
-my @st = DB::prof_times();
-sub __db_calibrate_adj {
-    my $x = shift;
+
+sub NONESUCH_noxs {
+	return $Devel::DProf::VERSION;
 }
-for my $i (1..$NCALOOP){
-    __db_calibrate_adj();
+
+{
+    package DB;
+
+    #
+    # As of perl5.003_20, &DB::sub stub is not needed (some versions
+    # even had problems if stub was redefined with XS version).
+    #
+
+    # disable DB single-stepping
+    BEGIN { $single = 0; }
+
+    # This sub is needed during startup.
+    sub DB {
+	#	print "nonXS DBDB\n";
+    }
 }
-my @et = DB::prof_times();
-for my $i (0..2){ $overhead[$i] = $et[$i] - $st[$i] }
-print DB::PROF "#CALIBRATED\n";
+
+use XSLoader ();
+
+$Devel::DProf::VERSION = '20110225.00';  # this version not authorized by
+				         # Dean Roehrich. See "Changes" file.
+
+use if $] >= 5.013, 'deprecate';
+
+sub import {
+    XSLoader::load 'Devel::DProf', $Devel::DProf::VERSION;
+}
 
 1;

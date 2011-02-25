@@ -1,4 +1,0 @@
-
-20080628_01
-	rename module Devel::DProfLB => Devel::DProf
-

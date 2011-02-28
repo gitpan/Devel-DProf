@@ -21,7 +21,7 @@ resources:
   bugtracker: http://rt.cpan.org/Public/Dist/Display.html?Name=Devel-DProf
   homepage: http://search.cpan.org/dist/Devel-DProf
   repository: git://github.com/rafl/devel-dprof.git
-version: 20110225.01
+version: 20110228.00
 x_Dist_Zilla:
   plugins:
     -

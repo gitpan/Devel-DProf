@@ -24,7 +24,7 @@ my %WriteMakefileArgs = (
   'PREREQ_PM' => {
     'XSLoader' => '0'
   },
-  'VERSION' => '20110225.01',
+  'VERSION' => '20110228.00',
   'test' => {
     'TESTS' => 't/*.t'
   }

@@ -43,7 +43,7 @@
          "web" : "http://github.com/rafl/devel-dprof"
       }
    },
-   "version" : "20110225.01",
+   "version" : "20110228.00",
    "x_Dist_Zilla" : {
       "plugins" : [
          {
